@@ -62,4 +62,4 @@ print(fitrf)
 
 ## Estimation of Out of Sample Error
 
-The accuracy of the final model is 98.33% and the Kappa is 97.89%. The Out of Sample Error is estimated to be greater than the In-Sample error of the model; so the Out of Sample Accuracy and Kappa is estimated to be less than the In-Sample Accuracy and Kappa.
+The accuracy of the final model is 98.33% and the Kappa is 97.89%. The Out of Sample Error is estimated to be greater than the In-Sample error of the model; so the Out of Sample Accuracy and Kappa is estimated to be less than the In-Sample Accuracy and Kappa of 98.33% and 97.89%.
