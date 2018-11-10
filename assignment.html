@@ -131,23 +131,13 @@ $(document).ready(function () {
 </div>
 <div id="importing-and-cleaning-data" class="section level2">
 <h2>Importing and Cleaning Data</h2>
-<p>After importing the data, data that was typecast as factor was typecast to numeric. Data in the test set which were entirely NA were removed from the training set to avoid having to impute. Additionally, identifying information not related to the measurements of the movements, such as user_name and timestamp, were removed from the training data as they were not relevant and could feed false information.</p>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Loading required package: lattice</code></pre>
-<pre><code>## Loading required package: ggplot2</code></pre>
-<pre class="r"><code>set.seed(100)
+<p>After importing the data, data that was typecast as factor was typecast to numeric. Data in the test set which were entirely NA were removed from the training set to avoid having to impute. Additionally, identifying information not related to the measurements of the movements, such as user_name and timestamp, were removed from the training data as they were not relevant and could feed false information. To estimate Out of Sample error, 20% of training data is withheld for cross validation.</p>
+<pre class="r"><code>library(caret)
+set.seed(100)
 train &lt;- read.csv(url('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'))
-test &lt;- read.csv(url(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;))
-library(dplyr)</code></pre>
-<pre><code>## 
-## Attaching package: 'dplyr'</code></pre>
-<pre><code>## The following objects are masked from 'package:stats':
-## 
-##     filter, lag</code></pre>
-<pre><code>## The following objects are masked from 'package:base':
-## 
-##     intersect, setdiff, setequal, union</code></pre>
-<pre class="r"><code>train[,-160] &lt;- train[,-160] %&gt;% mutate_if(is.factor, as.numeric)
+test &lt;- read.csv(url(&quot;https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv&quot;))</code></pre>
+<pre class="r"><code>library(dplyr)
+train[,-160] &lt;- train[,-160] %&gt;% mutate_if(is.factor, as.numeric)
 na_count &lt;- sapply(test %&gt;% select(-problem_id),
                    function(y) sum(length(which(is.na(y)))))
 train &lt;- train %&gt;% select(append(names(na_count[na_count == 0]), 'classe')) %&gt;%
@@ -156,17 +146,20 @@ train &lt;- train %&gt;% select(append(names(na_count[na_count == 0]), 'classe')
 test &lt;- test %&gt;% mutate_if(is.factor, as.numeric) %&gt;%
                  select(names(na_count[na_count == 0])) %&gt;%
                  select(-X, -user_name, -contains('timestamp'),
-                        -contains('window'))</code></pre>
+                        -contains('window'))
+inTrain &lt;- createDataPartition(train$classe, p=0.8, list=FALSE)
+trainData &lt;- train[inTrain, ]
+testData &lt;- train[-inTrain, ]</code></pre>
 </div>
 <div id="building-the-model" class="section level2">
 <h2>Building the Model</h2>
-<p>A random forest was selected for the model for it’s strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method as a middle ground between accurate model training and excessive model training time.</p>
+<p>A random forest was selected for the model for it’s strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method.</p>
 <pre class="r"><code>library(parallel)
 library(doParallel)
 cluster &lt;- makeCluster(detectCores() - 1)
 registerDoParallel(cluster)
 fitControl &lt;- trainControl(method='cv', number=10, allowParallel=TRUE)
-fitrf &lt;- train(classe~., data=train, method='rf',
+fitrf &lt;- train(classe~., data=trainData, method='rf',
                preProcess=c('center', 'scale', 'YeoJohnson', 'nzv', 'pca'),
                trControl=fitControl)
 stopCluster(cluster)
@@ -174,13 +167,74 @@ registerDoSEQ()</code></pre>
 </div>
 <div id="results" class="section level2">
 <h2>Results</h2>
+<p>The final model has an In-Sample Accuracy of 98.33% and Kappa of 97.89%. mtry is 2.</p>
+<pre class="r"><code>print(fitrf)</code></pre>
+<pre><code>## Random Forest 
+## 
+## 15699 samples
+##    52 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## Pre-processing: centered (52), scaled (52), Yeo-Johnson
+##  transformation (52), principal component signal extraction (52) 
+## Resampling: Cross-Validated (10 fold) 
+## Summary of sample sizes: 14130, 14132, 14128, 14129, 14128, 14128, ... 
+## Resampling results across tuning parameters:
+## 
+##   mtry  Accuracy   Kappa    
+##    2    0.9776395  0.9717140
+##   27    0.9661735  0.9572150
+##   52    0.9653456  0.9561658
+## 
+## Accuracy was used to select the optimal model using the largest value.
+## The final value used for the model was mtry = 2.</code></pre>
+<div id="out-of-sample-error-estimation" class="section level3">
+<h3>Out of Sample Error Estimation</h3>
+<p>The Out of Sample Error estimate is 1 - Out of Sample Accuracy; the Out of Sample Error estimation is 2.06%.</p>
+<pre class="r"><code>predcv &lt;- predict(fitrf, testData)
+cm &lt;- confusionMatrix(predcv, testData$classe)
+print(cm)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 1110   11    2    1    0
+##          B    4  736    4    0    1
+##          C    2   10  671   32    5
+##          D    0    0    7  610    0
+##          E    0    2    0    0  715
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9794          
+##                  95% CI : (0.9744, 0.9836)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.9739          
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            0.9946   0.9697   0.9810   0.9487   0.9917
+## Specificity            0.9950   0.9972   0.9849   0.9979   0.9994
+## Pos Pred Value         0.9875   0.9879   0.9319   0.9887   0.9972
+## Neg Pred Value         0.9979   0.9928   0.9959   0.9900   0.9981
+## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+## Detection Rate         0.2829   0.1876   0.1710   0.1555   0.1823
+## Detection Prevalence   0.2865   0.1899   0.1835   0.1573   0.1828
+## Balanced Accuracy      0.9948   0.9834   0.9829   0.9733   0.9955</code></pre>
+</div>
+<div id="final-test-cases" class="section level3">
+<h3>Final test cases</h3>
 <p>The final model correctly predicted 19 of 20 of the test cases.</p>
 <pre class="r"><code>predrf &lt;- predict(fitrf, test)
 print(data.frame(predrf))</code></pre>
 <pre><code>##    predrf
 ## 1       B
 ## 2       A
-## 3       A
+## 3       B
 ## 4       A
 ## 5       A
 ## 6       E
@@ -198,34 +252,15 @@ print(data.frame(predrf))</code></pre>
 ## 18      B
 ## 19      B
 ## 20      B</code></pre>
-<pre class="r"><code>print(fitrf)</code></pre>
-<pre><code>## Random Forest 
-## 
-## 19622 samples
-##    52 predictor
-##     5 classes: 'A', 'B', 'C', 'D', 'E' 
-## 
-## Pre-processing: centered (52), scaled (52), Yeo-Johnson
-##  transformation (52), principal component signal extraction (52) 
-## Resampling: Cross-Validated (10 fold) 
-## Summary of sample sizes: 17659, 17662, 17659, 17660, 17660, 17662, ... 
-## Resampling results across tuning parameters:
-## 
-##   mtry  Accuracy   Kappa    
-##    2    0.9832845  0.9788541
-##   27    0.9736525  0.9666716
-##   52    0.9733981  0.9663482
-## 
-## Accuracy was used to select the optimal model using the largest value.
-## The final value used for the model was mtry = 2.</code></pre>
 </div>
-<div id="use-of-cross-validation" class="section level2">
-<h2>Use of Cross Validation</h2>
-<p>10-fold Cross validation was used to perform multiple evaluations of different model tuning parameters and estimate the error rate for each. The tuning parameter evaluated for this model was the number of variables randomly sampled as candidates for each split; the values evaluated were 2, 27, and 52. The tuning parameter value with the highest accuracy was selected as the final model.</p>
 </div>
-<div id="estimation-of-out-of-sample-error" class="section level2">
-<h2>Estimation of Out of Sample Error</h2>
-<p>The accuracy of the final model is 98.33% and the Kappa is 97.89%. The Out of Sample Error is estimated to be greater than the In-Sample error of the model; so the Out of Sample Accuracy and Kappa is estimated to be less than the In-Sample Accuracy and Kappa of 98.33% and 97.89%.</p>
+<div id="discussion" class="section level2">
+<h2>Discussion</h2>
+<div id="use-of-cross-validation" class="section level3">
+<h3>Use of Cross Validation</h3>
+<p>10-fold Cross validation was used in training to perform multiple evaluations of different model tuning parameters and estimate the error rate for each. The tuning parameter evaluated for this model was the number of variables randomly sampled as candidates for each split, mtry; the values evaluated were 2, 27, and 52. The tuning parameter value with the highest accuracy was selected as the final model.</p>
+<p>Cross validation was used in the estimation of Out of Sample Error. Because a portion of the data is withheld from training, it can be used to estimate Out of Sample Error.</p>
+</div>
 </div>
 
 

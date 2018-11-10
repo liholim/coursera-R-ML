@@ -10,12 +10,16 @@ From the paper *Qualitative Activity Recognition of Weight Lifting Exercises*, a
 ## Importing and Cleaning Data
 
 After importing the data, data that was typecast as factor was typecast to numeric. Data in the test set which were entirely NA were removed from the training set to avoid having to impute. Additionally, identifying information not related to the measurements of the movements, such as user_name and timestamp, were removed from the training data as they were not relevant and could feed false information.
+To estimate Out of Sample error, 20% of training data is withheld for cross validation.
 
 ```{r import, cache=TRUE}
 library(caret)
 set.seed(100)
 train <- read.csv(url('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv'))
 test <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+```
+
+```{r cleandata, cache=TRUE}
 library(dplyr)
 train[,-160] <- train[,-160] %>% mutate_if(is.factor, as.numeric)
 na_count <- sapply(test %>% select(-problem_id),
@@ -27,11 +31,14 @@ test <- test %>% mutate_if(is.factor, as.numeric) %>%
                  select(names(na_count[na_count == 0])) %>%
                  select(-X, -user_name, -contains('timestamp'),
                         -contains('window'))
+inTrain <- createDataPartition(train$classe, p=0.8, list=FALSE)
+trainData <- train[inTrain, ]
+testData <- train[-inTrain, ]
 ```
 
 ## Building the Model
 
-A random forest was selected for the model for it's strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method as a middle ground between accurate model training and excessive model training time. 
+A random forest was selected for the model for it's strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method. 
 
 ```{r model, cache=TRUE}
 library(parallel)
@@ -39,7 +46,7 @@ library(doParallel)
 cluster <- makeCluster(detectCores() - 1)
 registerDoParallel(cluster)
 fitControl <- trainControl(method='cv', number=10, allowParallel=TRUE)
-fitrf <- train(classe~., data=train, method='rf',
+fitrf <- train(classe~., data=trainData, method='rf',
                preProcess=c('center', 'scale', 'YeoJohnson', 'nzv', 'pca'),
                trControl=fitControl)
 stopCluster(cluster)
@@ -48,18 +55,35 @@ registerDoSEQ()
 
 ## Results
 
+The final model has an In-Sample Accuracy of 98.33% and Kappa of 97.89%. mtry is 2.
+
+```{r finalmodel, cache=TRUE}
+print(fitrf)
+```
+
+### Out of Sample Error Estimation
+
+The Out of Sample Error estimate is 1 - Out of Sample Accuracy; the Out of Sample Error estimation is 2.06%. 
+
+```{r cvtest, cache=TRUE}
+predcv <- predict(fitrf, testData)
+cm <- confusionMatrix(predcv, testData$classe)
+print(cm)
+```
+
+### Final test cases
+
 The final model correctly predicted 19 of 20 of the test cases.
 
 ```{r test, cache=TRUE}
 predrf <- predict(fitrf, test)
 print(data.frame(predrf))
-print(fitrf)
 ```
 
-## Use of Cross Validation
+## Discussion
 
-10-fold Cross validation was used to perform multiple evaluations of different model tuning parameters and estimate the error rate for each. The tuning parameter evaluated for this model was the number of variables randomly sampled as candidates for each split; the values evaluated were 2, 27, and 52. The tuning parameter value with the highest accuracy was selected as the final model.
+### Use of Cross Validation
 
-## Estimation of Out of Sample Error
+10-fold Cross validation was used in training to perform multiple evaluations of different model tuning parameters and estimate the error rate for each. The tuning parameter evaluated for this model was the number of variables randomly sampled as candidates for each split, mtry; the values evaluated were 2, 27, and 52. The tuning parameter value with the highest accuracy was selected as the final model.
 
-The accuracy of the final model is 98.33% and the Kappa is 97.89%. The Out of Sample Error is estimated to be greater than the In-Sample error of the model; so the Out of Sample Accuracy and Kappa is estimated to be less than the In-Sample Accuracy and Kappa of 98.33% and 97.89%.
+Cross validation was used in the estimation of Out of Sample Error. Because a portion of the data is withheld from training, it can be used to estimate Out of Sample Error.
