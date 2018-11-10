@@ -38,7 +38,7 @@ testData <- train[-inTrain, ]
 
 ## Building the Model
 
-A random forest was selected for the model for it's strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method. 
+A random forest was selected for the model for it's strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis extraction for 95% of explained variation. A 10-fold cross validation was used for the resampling method. 
 
 ```{r model, cache=TRUE}
 library(parallel)

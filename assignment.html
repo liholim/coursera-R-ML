@@ -153,7 +153,7 @@ testData &lt;- train[-inTrain, ]</code></pre>
 </div>
 <div id="building-the-model" class="section level2">
 <h2>Building the Model</h2>
-<p>A random forest was selected for the model for it’s strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis for 95% of explained variation. A 10-fold cross validation was used for the resampling method.</p>
+<p>A random forest was selected for the model for it’s strength in classification. The data was preprocessed using centering, scaling, Yeo-Johnson Transformation, removal of near zero variance predictors, and principal component analysis extraction for 95% of explained variation. A 10-fold cross validation was used for the resampling method.</p>
 <pre class="r"><code>library(parallel)
 library(doParallel)
 cluster &lt;- makeCluster(detectCores() - 1)
