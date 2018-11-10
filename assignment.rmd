@@ -73,7 +73,7 @@ print(cm)
 
 ### Final test cases
 
-The final model correctly predicted 19 of 20 of the test cases.
+The final model correctly predicted 20 of 20 of the test cases.
 
 ```{r test, cache=TRUE}
 predrf <- predict(fitrf, test)
